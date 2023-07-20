@@ -208,11 +208,11 @@ func (c *Client) Multiscan(ctx context.Context, path string, opts ...Option) (*M
 	}, nil
 }
 
-type InstreamResponse struct {
+type InstreamResult struct {
 	Raw string
 }
 
-func (c *Client) Instream(ctx context.Context, stream []byte, opts ...Option) (*InstreamResponse, error) {
+func (c *Client) Instream(ctx context.Context, stream []byte, opts ...Option) (*InstreamResult, error) {
 	chunks := splitStream(string(stream), c.chunkSize)
 
 	payload := make([][]byte, 0, len(chunks)+1)
@@ -225,7 +225,7 @@ func (c *Client) Instream(ctx context.Context, stream []byte, opts ...Option) (*
 		return nil, err
 	}
 
-	return &InstreamResponse{
+	return &InstreamResult{
 		Raw: string(resp),
 	}, nil
 }
@@ -280,17 +280,19 @@ func (c *Client) sendCommand(ctx context.Context, stream [][]byte, opts ...Optio
 		errChan <- fmt.Errorf("Unknown response: %v", string(rawResp))
 	}()
 
-	select {
-	case <-ctx.Done():
-		if err := c.Close(); err != nil {
-			return nil, err
-		}
+	for {
+		select {
+		case <-ctx.Done():
+			if err := c.Close(); err != nil {
+				return nil, err
+			}
 
-		return nil, ctx.Err()
-	case r := <-respChan:
-		return r, nil
-	case e := <-errChan:
-		return nil, e
+			return nil, ctx.Err()
+		case r := <-respChan:
+			return r, nil
+		case e := <-errChan:
+			return nil, e
+		}
 	}
 }
 
