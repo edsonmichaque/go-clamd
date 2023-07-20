@@ -58,7 +58,7 @@ func newClient(opt *Options) *client {
 
 func (c client) dial(ctx context.Context) (*Conn, error) {
 	opt := c.opt
-	if opt != nil {
+	if opt == nil {
 		opt = DefaultOptions
 	}
 
