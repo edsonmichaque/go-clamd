@@ -84,11 +84,7 @@ func (c client) dial(ctx context.Context) (*Conn, error) {
 
 func newDialer(opt *Options) func(context.Context, string, string) (net.Conn, error) {
 	return func(ctx context.Context, network, address string) (net.Conn, error) {
-		dialer := &net.Dialer{
-			Timeout: opt.DialTimeout,
-		}
-
-		return dialer.DialContext(ctx, network, address)
+		return (&net.Dialer{Timeout: opt.DialTimeout}).DialContext(ctx, network, address)
 	}
 }
 
@@ -226,7 +222,6 @@ func (c *Clamd) sendCommand(ctx context.Context, cmd *Command) (*Result, error) 
 			if _, err := conn.conn.Write(i); err != nil {
 				errChan <- err
 				return
-
 			}
 		}
 
@@ -242,7 +237,6 @@ func (c *Clamd) sendCommand(ctx context.Context, cmd *Command) (*Result, error) 
 				errChan <- err
 				return
 			}
-
 			count += n
 
 			if _, err := buf.Write(chunk[:n]); err != nil {
