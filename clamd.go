@@ -94,10 +94,6 @@ func (c *Client) Close() error {
 	return c.conn.Close()
 }
 
-func Newline(s string) []byte {
-	return []byte(fmt.Sprintf("%s\n", s))
-}
-
 type PingResult struct{}
 
 func (c *Client) Ping(ctx context.Context, opts ...Option) (*PingResult, error) {
@@ -216,44 +212,6 @@ type InstreamResponse struct {
 	Raw string
 }
 
-func splitStream(content string, size int) [][]byte {
-	var (
-		rawParts = []byte(content)
-		length   = len(rawParts) / size
-		rem      = len(rawParts) % size
-	)
-
-	nItems := length
-	if rem > 0 {
-		nItems++
-	}
-
-	chunks := make([][]byte, 0, nItems)
-
-	for i := 0; i < length; i++ {
-		buf := new(bytes.Buffer)
-
-		binary.Write(buf, binary.BigEndian, uint32(size))
-		buf.Write(rawParts[i*size : i*size+size])
-		chunks = append(chunks, buf.Bytes())
-	}
-
-	if rem > 0 {
-		buf := new(bytes.Buffer)
-		binary.Write(buf, binary.BigEndian, uint32(rem))
-		buf.Write(rawParts[len(rawParts)-(rem):])
-		chunks = append(chunks, buf.Bytes())
-		buf.Reset()
-	}
-
-	buf := new(bytes.Buffer)
-
-	binary.Write(buf, binary.BigEndian, uint32(0))
-	chunks = append(chunks, buf.Bytes())
-
-	return chunks
-}
-
 func (c *Client) Instream(ctx context.Context, stream []byte, opts ...Option) (*InstreamResponse, error) {
 	chunks := splitStream(string(stream), c.chunkSize)
 
@@ -336,26 +294,116 @@ func (c *Client) sendCommand(ctx context.Context, stream [][]byte, opts ...Optio
 	}
 }
 
-type StatsResult struct{}
+type StatsResult struct {
+	Raw string
+}
 
 func (c *Client) Stats(ctx context.Context, opts ...Option) (*StatsResult, error) {
-	return nil, nil
+	payload := [][]byte{
+		nCmd("VERSION"),
+	}
+
+	resp, err := c.sendCommand(ctx, payload)
+	if err != nil {
+		return nil, err
+	}
+
+	return &StatsResult{
+		Raw: string(resp),
+	}, nil
 }
 
-type VersioncommandsResult struct{}
+type VersioncommandsResult struct {
+	Raw string
+}
 
 func (c *Client) Versioncommands(ctx context.Context, opts ...Option) (*VersioncommandsResult, error) {
-	return nil, nil
+	payload := [][]byte{
+		nCmd("VERSIONCOMMANDS"),
+	}
+
+	resp, err := c.sendCommand(ctx, payload)
+	if err != nil {
+		return nil, err
+	}
+
+	return &VersioncommandsResult{
+		Raw: string(resp),
+	}, nil
 }
 
-type IdsessionResult struct{}
+type IdsessionResult struct {
+	Raw string
+}
 
 func (c *Client) Idsession(ctx context.Context, opts ...Option) (*IdsessionResult, error) {
-	return nil, nil
+	payload := [][]byte{
+		nCmd("IDSESSION"),
+	}
+
+	resp, err := c.sendCommand(ctx, payload)
+	if err != nil {
+		return nil, err
+	}
+
+	return &IdsessionResult{
+		Raw: string(resp),
+	}, nil
 }
 
-type EndResult struct{}
+type EndResult struct {
+	Raw string
+}
 
 func (c *Client) End(ctx context.Context, opts ...Option) (*EndResult, error) {
-	return nil, nil
+	payload := [][]byte{
+		nCmd("END"),
+	}
+
+	resp, err := c.sendCommand(ctx, payload)
+	if err != nil {
+		return nil, err
+	}
+
+	return &EndResult{
+		Raw: string(resp),
+	}, nil
+}
+
+func splitStream(content string, size int) [][]byte {
+	var (
+		rawParts = []byte(content)
+		length   = len(rawParts) / size
+		rem      = len(rawParts) % size
+	)
+
+	nItems := length
+	if rem > 0 {
+		nItems++
+	}
+
+	chunks := make([][]byte, 0, nItems)
+
+	for i := 0; i < length; i++ {
+		buf := new(bytes.Buffer)
+
+		binary.Write(buf, binary.BigEndian, uint32(size))
+		buf.Write(rawParts[i*size : i*size+size])
+		chunks = append(chunks, buf.Bytes())
+	}
+
+	if rem > 0 {
+		buf := new(bytes.Buffer)
+		binary.Write(buf, binary.BigEndian, uint32(rem))
+		buf.Write(rawParts[len(rawParts)-(rem):])
+		chunks = append(chunks, buf.Bytes())
+		buf.Reset()
+	}
+
+	buf := new(bytes.Buffer)
+
+	binary.Write(buf, binary.BigEndian, uint32(0))
+	chunks = append(chunks, buf.Bytes())
+
+	return chunks
 }
