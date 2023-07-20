@@ -1,6 +1,7 @@
 package clamd
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -10,9 +11,9 @@ import (
 )
 
 var (
-	DefaultChunkSize    = 1 << 10
-	DefaultResponseSize = 1 << 10
-	defaultOptions      = &Options{
+	MaxChunkSize      = 1 << 10
+	MaxResponseBuffer = 1 << 10
+	defaultOptions    = &Options{
 		Network:    "tcp",
 		Address:    "localhost:3310",
 		MaxRetries: 3,
@@ -153,7 +154,7 @@ func newCommandWithBody(cmd, arg string, body io.ReadCloser) (*Command, error) {
 
 	return &Command{
 		Name: name,
-		Body: splitChunks(input, DefaultChunkSize),
+		Body: splitChunks(input, MaxChunkSize),
 	}, nil
 }
 
@@ -216,21 +217,33 @@ func (c *Clamd) send(ctx context.Context, cmd *Command) (*Result, error) {
 			}
 		}
 
-		rawResp := make([]byte, 1024*1024)
-		if _, err := conn.conn.Read(rawResp); err != nil {
-			errChan <- err
-			return
-		}
+		var buf bytes.Buffer
+		var count int
 
-		if len(rawResp) != 0 {
-			respChan <- Result{
-				Body: rawResp,
+		for {
+			chunk := make([]byte, 0, 8192)
+			n, err := conn.conn.Read(chunk)
+			if err != nil && err != io.EOF {
+				errChan <- err
+				return
 			}
 
-			return
+			count += n
+
+			if _, err := buf.Write(chunk[:n]); err != nil {
+				errChan <- err
+				return
+			}
+
+			if n == 0 {
+				break
+			}
 		}
 
-		errChan <- fmt.Errorf("Unknown response: %v", string(rawResp))
+		respChan <- Result{
+			Body: buf.Bytes(),
+		}
+
 	}()
 
 	for {
