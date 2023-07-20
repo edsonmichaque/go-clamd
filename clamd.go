@@ -9,6 +9,11 @@ import (
 	"net"
 )
 
+var (
+	DefaultChunkSize    = 1 << 10
+	DefaultResponseSize = 1 << 10
+)
+
 func NewClient(opts ...Option) (*Client, error) {
 	newClient := &Client{
 		chunkSize: DefaultChunkSize,
@@ -20,8 +25,6 @@ func NewClient(opts ...Option) (*Client, error) {
 
 	return newClient, nil
 }
-
-var DefaultChunkSize = 1 << 10
 
 type Client struct {
 	dialFunc  func() (net.Conn, error)
