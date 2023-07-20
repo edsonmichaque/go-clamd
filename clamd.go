@@ -91,32 +91,51 @@ const (
 	CommandStats           = "STATS"
 )
 
-func NewCommand(cmdName string, arg string, args io.ReadCloser) (*Command, error) {
-	var newCmd Command
-
-	switch cmdName {
-	case CommandVersion, CommandVersionCommands, CommandStats, CommandPing, CommandReload:
-		newCmd.Name = fmt.Sprintf("n%s\n", cmdName)
-	case CommandScan, CommandMuliScan, CommandContScan, CommandAllMatchScan:
-		newCmd.Name = fmt.Sprintf("n%s %s\n", cmdName, arg)
-	case CommandInstream:
-		newCmd.Name = fmt.Sprintf("z%s\x00", cmdName)
-		input, err := io.ReadAll(args)
-		if err != nil {
-			return nil, err
-		}
-
-		newCmd.Body = splitChunks(input, DefaultChunkSize)
-	default:
-		return nil, errors.New("invalid command")
-
-	}
-
-	return &newCmd, nil
-}
-
 type Result struct {
 	Body []byte
+}
+
+func NewCommand(cmdName string, arg string, args io.ReadCloser) (*Command, error) {
+	commandBuilders := map[string]func(string, string, io.ReadCloser) (*Command, error){
+		CommandPing:            newCommand,
+		CommandReload:          newCommand,
+		CommandVersion:         newCommand,
+		CommandStats:           newCommand,
+		CommandVersionCommands: newCommand,
+		CommandAllMatchScan:    newCommandWithArgs,
+		CommandScan:            newCommandWithArgs,
+		CommandContScan:        newCommandWithArgs,
+		CommandMuliScan:        newCommandWithArgs,
+		CommandInstream:        newCommandWithBody,
+	}
+
+	builder, ok := commandBuilders[cmdName]
+	if !ok {
+		return nil, errors.New("invalid command")
+	}
+
+	return builder(cmdName, arg, args)
+}
+
+func newCommand(cmd, arg string, body io.ReadCloser) (*Command, error) {
+	return &Command{Name: fmt.Sprintf("n%s\n", cmd)}, nil
+}
+
+func newCommandWithArgs(cmd, arg string, body io.ReadCloser) (*Command, error) {
+	return &Command{Name: fmt.Sprintf("n%s %s\n", cmd, arg)}, nil
+}
+
+func newCommandWithBody(cmd, arg string, body io.ReadCloser) (*Command, error) {
+	name := fmt.Sprintf("z%s\x00", cmd)
+	input, err := io.ReadAll(body)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Command{
+		Name: name,
+		Body: splitChunks(input, DefaultChunkSize),
+	}, nil
 }
 
 func (c *Clamd) Do(ctx context.Context, cmd *Command) (*Result, error) {
