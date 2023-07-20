@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"time"
 )
@@ -164,24 +163,24 @@ func newCommandWithBody(cmd, arg string, body io.ReadCloser) (*Command, error) {
 	}, nil
 }
 
-func (c *Clamd) Do(ctx context.Context, cmd *Command) (*Result, error) {
+func (c *Clamd) SendCommand(ctx context.Context, cmd *Command) (*Result, error) {
 	var (
-		res      *Result
-		err      error
-		attempts int
+		res     *Result
+		err     error
+		attempt int
 	)
 
 	wait := c.client.opt.MinRetryBackoff
 
-	for attempts = 0; attempts < c.opt.MaxRetries; attempts++ {
+	for attempt = 0; attempt < c.opt.MaxRetries; attempt++ {
 		if err := ctx.Err(); err != nil {
 			return nil, err
 		}
 
-		res, err = c.send(ctx, cmd)
+		res, err = c.sendCommand(ctx, cmd)
 		if err != nil {
 			if shouldRetry(err) {
-				if attempts != 0 {
+				if attempt != 0 {
 					time.Sleep(wait)
 					wait = wait * 2
 				}
@@ -198,12 +197,12 @@ func (c *Clamd) Do(ctx context.Context, cmd *Command) (*Result, error) {
 		return nil, err
 	}
 
-	res.Attempts = attempts + 1
+	res.Attempts = attempt + 1
 	return res, nil
 
 }
 
-func (c *Clamd) send(ctx context.Context, cmd *Command) (*Result, error) {
+func (c *Clamd) sendCommand(ctx context.Context, cmd *Command) (*Result, error) {
 	conn, err := c.dial(ctx)
 	if err != nil {
 		return nil, err
@@ -211,7 +210,7 @@ func (c *Clamd) send(ctx context.Context, cmd *Command) (*Result, error) {
 
 	defer conn.conn.Close()
 
-	respChan := make(chan Result, 1)
+	respChan := make(chan *Result, 1)
 	defer close(respChan)
 
 	errChan := make(chan error, 1)
@@ -256,20 +255,18 @@ func (c *Clamd) send(ctx context.Context, cmd *Command) (*Result, error) {
 			}
 		}
 
-		respChan <- Result{
+		respChan <- &Result{
 			Body: buf.Bytes(),
 		}
 
 	}()
 
-	for {
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case r := <-respChan:
-			return &r, nil
-		case e := <-errChan:
-			return nil, e
-		}
+	select {
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	case r := <-respChan:
+		return r, nil
+	case e := <-errChan:
+		return nil, e
 	}
 }

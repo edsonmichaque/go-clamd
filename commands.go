@@ -16,7 +16,7 @@ func (c *Clamd) Ping(ctx context.Context, opts ...Option) (*PingResult, error) {
 		return nil, err
 	}
 
-	resp, err := c.Do(ctx, cmd)
+	resp, err := c.SendCommand(ctx, cmd)
 	if err != nil {
 		return nil, err
 	}
@@ -40,7 +40,7 @@ func (c *Clamd) Version(ctx context.Context, opts ...Option) (*VersionResult, er
 		return nil, err
 	}
 
-	resp, err := c.Do(ctx, cmd)
+	resp, err := c.SendCommand(ctx, cmd)
 	if err != nil {
 		return nil, err
 	}
