@@ -168,6 +168,10 @@ func (c *Clamd) Do(ctx context.Context, cmd *Command) (*Result, error) {
 	wait := 100 * time.Millisecond
 
 	for attempts = 0; attempts < c.opt.MaxRetries; attempts++ {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+
 		res, err = c.send(ctx, cmd)
 		if err != nil {
 			if shouldRetry(err) {
