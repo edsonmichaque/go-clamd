@@ -16,7 +16,7 @@ var (
 	defaultOptions    = &Options{
 		Network:    "tcp",
 		Address:    "localhost:3310",
-		MaxRetries: 3,
+		MaxRetries: 5,
 	}
 	DefaultClient = &Clamd{
 		client: newClient(defaultOptions),
@@ -181,6 +181,11 @@ func (c *Clamd) Do(ctx context.Context, cmd *Command) (*Result, error) {
 
 			return nil, err
 		}
+		break
+	}
+
+	if err != nil {
+		return nil, err
 	}
 
 	res.Attempts = attempts + 1
@@ -203,7 +208,6 @@ func (c *Clamd) send(ctx context.Context, cmd *Command) (*Result, error) {
 	defer close(errChan)
 
 	go func() {
-
 		if _, err := conn.conn.Write([]byte(cmd.Name)); err != nil {
 			errChan <- err
 			return
@@ -217,11 +221,13 @@ func (c *Clamd) send(ctx context.Context, cmd *Command) (*Result, error) {
 			}
 		}
 
-		var buf bytes.Buffer
-		var count int
+		var (
+			buf   = new(bytes.Buffer)
+			count = 0
+		)
 
 		for {
-			chunk := make([]byte, 0, 8192)
+			chunk := make([]byte, 1024)
 			n, err := conn.conn.Read(chunk)
 			if err != nil && err != io.EOF {
 				errChan <- err
