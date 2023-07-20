@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"net"
 	"time"
 )
@@ -14,9 +15,10 @@ var (
 	MaxChunkSize      = 1 << 10
 	MaxResponseBuffer = 1 << 10
 	defaultOptions    = &Options{
-		Network:    "tcp",
-		Address:    "localhost:3310",
-		MaxRetries: 5,
+		Network:         "tcp",
+		Address:         "localhost:3310",
+		MaxRetries:      5,
+		MinRetryBackoff: 100 * time.Millisecond,
 	}
 	DefaultClient = &Clamd{
 		client: newClient(defaultOptions),
@@ -54,6 +56,10 @@ func newClient(opt *Options) *client {
 
 	if opt.MaxRetries == 0 {
 		opt.MaxRetries = defaultOptions.MaxRetries
+	}
+
+	if opt.MinRetryBackoff == 0 {
+		opt.MinRetryBackoff = defaultOptions.MinRetryBackoff
 	}
 
 	c := &client{
@@ -165,7 +171,7 @@ func (c *Clamd) Do(ctx context.Context, cmd *Command) (*Result, error) {
 		attempts int
 	)
 
-	wait := 100 * time.Millisecond
+	wait := c.client.opt.MinRetryBackoff
 
 	for attempts = 0; attempts < c.opt.MaxRetries; attempts++ {
 		if err := ctx.Err(); err != nil {
