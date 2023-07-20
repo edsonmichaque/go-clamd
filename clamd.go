@@ -6,17 +6,19 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"time"
 )
 
 var (
 	DefaultChunkSize    = 1 << 10
 	DefaultResponseSize = 1 << 10
-	DefaultOptions      = &Options{
-		Network: "tcp",
-		Address: "localhost:3310",
+	defaultOptions      = &Options{
+		Network:    "tcp",
+		Address:    "localhost:3310",
+		MaxRetries: 3,
 	}
 	DefaultClient = &Clamd{
-		client: newClient(DefaultOptions),
+		client: newClient(defaultOptions),
 	}
 )
 
@@ -49,6 +51,10 @@ func newClient(opt *Options) *client {
 		opt.Dialer = newDialer(opt)
 	}
 
+	if opt.MaxRetries == 0 {
+		opt.MaxRetries = defaultOptions.MaxRetries
+	}
+
 	c := &client{
 		opt: opt,
 	}
@@ -59,7 +65,7 @@ func newClient(opt *Options) *client {
 func (c client) dial(ctx context.Context) (*Conn, error) {
 	opt := c.opt
 	if opt == nil {
-		opt = DefaultOptions
+		opt = defaultOptions
 	}
 
 	conn, err := opt.Dialer(ctx, opt.Network, opt.Address)
@@ -104,7 +110,8 @@ const (
 )
 
 type Result struct {
-	Body []byte
+	Attempts int
+	Body     []byte
 }
 
 func NewCommand(cmdName string, arg string, args io.ReadCloser) (*Command, error) {
@@ -151,6 +158,36 @@ func newCommandWithBody(cmd, arg string, body io.ReadCloser) (*Command, error) {
 }
 
 func (c *Clamd) Do(ctx context.Context, cmd *Command) (*Result, error) {
+	var (
+		res      *Result
+		err      error
+		attempts int
+	)
+
+	wait := 100 * time.Millisecond
+
+	for attempts = 0; attempts < c.opt.MaxRetries; attempts++ {
+		res, err = c.send(ctx, cmd)
+		if err != nil {
+			if shouldRetry(err) {
+				if attempts != 0 {
+					time.Sleep(wait)
+					wait = wait * 2
+				}
+
+				continue
+			}
+
+			return nil, err
+		}
+	}
+
+	res.Attempts = attempts + 1
+	return res, nil
+
+}
+
+func (c *Clamd) send(ctx context.Context, cmd *Command) (*Result, error) {
 	conn, err := c.dial(ctx)
 	if err != nil {
 		return nil, err

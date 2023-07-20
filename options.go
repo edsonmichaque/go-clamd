@@ -20,5 +20,6 @@ type Options struct {
 	MinRetryBackoff time.Duration
 	MaxRetryBackoff time.Duration
 	OnConnect       func(context.Context)
+	MaxIdleConns    int
 	TLSConfig       *tls.Config
 }
