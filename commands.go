@@ -4,6 +4,8 @@ import (
 	"context"
 )
 
+var c = DefaultClient
+
 type PingResult struct {
 	Raw string
 }
@@ -24,6 +26,10 @@ func (c *Clamd) Ping(ctx context.Context, opts ...Option) (*PingResult, error) {
 	}, nil
 }
 
+func Ping(ctx context.Context, opts ...Option) (*PingResult, error) {
+	return c.Ping(ctx, opts...)
+}
+
 type VersionResult struct {
 	Raw string
 }
@@ -42,4 +48,8 @@ func (c *Clamd) Version(ctx context.Context, opts ...Option) (*VersionResult, er
 	return &VersionResult{
 		Raw: string(resp.Body),
 	}, nil
+}
+
+func Version(ctx context.Context, opts ...Option) (*VersionResult, error) {
+	return c.Version(ctx, opts...)
 }

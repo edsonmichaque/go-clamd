@@ -11,6 +11,13 @@ import (
 var (
 	DefaultChunkSize    = 1 << 10
 	DefaultResponseSize = 1 << 10
+	DefaultOptions      = &Options{
+		Network: "tcp",
+		Address: "localhost:3310",
+	}
+	DefaultClient = &Clamd{
+		client: newClient(DefaultOptions),
+	}
 )
 
 func New(opt *Options) (*Clamd, error) {
@@ -50,7 +57,12 @@ func newClient(opt *Options) *client {
 }
 
 func (c client) dial(ctx context.Context) (*Conn, error) {
-	conn, err := c.opt.Dialer(ctx, c.opt.Network, c.opt.Address)
+	opt := c.opt
+	if opt != nil {
+		opt = DefaultOptions
+	}
+
+	conn, err := opt.Dialer(ctx, opt.Network, opt.Address)
 	if err != nil {
 		return nil, err
 	}
