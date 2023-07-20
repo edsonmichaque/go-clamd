@@ -24,7 +24,11 @@ func (c *Clamd) Ping(ctx context.Context, opts ...Option) (*PingResult, error) {
 	}, nil
 }
 
-func (c *Clamd) Version(ctx context.Context, opts ...Option) (*PingResult, error) {
+type VersionResult struct {
+	Raw string
+}
+
+func (c *Clamd) Version(ctx context.Context, opts ...Option) (*VersionResult, error) {
 	cmd, err := NewCommand(CommandVersion, "", nil)
 	if err != nil {
 		return nil, err
@@ -35,7 +39,7 @@ func (c *Clamd) Version(ctx context.Context, opts ...Option) (*PingResult, error
 		return nil, err
 	}
 
-	return &PingResult{
+	return &VersionResult{
 		Raw: string(resp.Body),
 	}, nil
 }
